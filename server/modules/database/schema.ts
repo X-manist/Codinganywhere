@@ -113,6 +113,14 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
     status TEXT NOT NULL DEFAULT 'pending',
     -- Why a failed one failed, shown next to it in the composer.
     failure_reason TEXT,
+    -- Recurring schedules: NULL for one-shot messages, else 'daily' | 'weekly'.
+    -- The wall-clock time is the server's local time, in 'HH:MM' form; weekly
+    -- adds recurrence_dow (0=Sunday). Every fire inserts the next pending
+    -- instance sharing the same series_id, so past runs stay as history.
+    recurrence TEXT,
+    recurrence_time TEXT,
+    recurrence_dow INTEGER,
+    series_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

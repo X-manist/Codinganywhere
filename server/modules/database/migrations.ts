@@ -457,6 +457,19 @@ const addSessionEffortColumn = (db: Database): void => {
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'effort', 'TEXT');
 };
 
+const addScheduledMessageRecurrenceColumns = (db: Database): void => {
+  if (!tableExists(db, 'scheduled_messages')) {
+    return;
+  }
+  const tableInfo = getTableInfo(db, 'scheduled_messages');
+  const columnNames = tableInfo.map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'scheduled_messages', columnNames, 'recurrence', 'TEXT');
+  addColumnToTableIfNotExists(db, 'scheduled_messages', columnNames, 'recurrence_time', 'TEXT');
+  addColumnToTableIfNotExists(db, 'scheduled_messages', columnNames, 'recurrence_dow', 'INTEGER');
+  addColumnToTableIfNotExists(db, 'scheduled_messages', columnNames, 'series_id', 'TEXT');
+};
+
 const ensureProjectsForSessionPaths = (db: Database): void => {
   if (!tableExists(db, 'sessions')) {
     return;
@@ -521,6 +534,7 @@ export const runMigrations = (db: Database) => {
     addForkedFromSessionIdColumn(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
+    addScheduledMessageRecurrenceColumns(db);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

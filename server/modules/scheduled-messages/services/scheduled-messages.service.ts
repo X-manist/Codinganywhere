@@ -1,10 +1,11 @@
 import { scheduledMessagesDb, sessionsDb } from '@/modules/database/index.js';
-import type { ScheduledMessageRow } from '@/modules/database/index.js';
+import type { ScheduledMessageRow, ScheduledRecurrence } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 
 /** How far ahead a message may be scheduled. Beyond this it is almost certainly a mistake. */
 const MAX_SCHEDULE_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_CONTENT_LENGTH = 100_000;
+const TIME_OF_DAY_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export type ScheduledMessage = {
   id: string;
@@ -14,6 +15,8 @@ export type ScheduledMessage = {
   scheduledFor: string;
   status: ScheduledMessageRow['status'];
   failureReason: string | null;
+  recurrence: ScheduledRecurrence | null;
+  seriesId: string | null;
   createdAt: string;
 };
 
@@ -29,6 +32,41 @@ function readOptions(raw: string): Record<string, unknown> {
   }
 }
 
+function readRecurrence(raw: unknown): ScheduledRecurrence | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new AppError('recurrence must be an object.', {
+      code: 'INVALID_RECURRENCE',
+      statusCode: 400,
+    });
+  }
+  const { type, time, dayOfWeek } = raw as Record<string, unknown>;
+  if (type !== 'daily' && type !== 'weekly') {
+    throw new AppError('recurrence.type must be "daily" or "weekly".', {
+      code: 'INVALID_RECURRENCE',
+      statusCode: 400,
+    });
+  }
+  if (typeof time !== 'string' || !TIME_OF_DAY_PATTERN.test(time)) {
+    throw new AppError('recurrence.time must be "HH:MM" (24-hour).', {
+      code: 'INVALID_RECURRENCE',
+      statusCode: 400,
+    });
+  }
+  if (type === 'weekly') {
+    if (typeof dayOfWeek !== 'number' || !Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      throw new AppError('recurrence.dayOfWeek must be 0 (Sunday) through 6 (Saturday) for weekly.', {
+        code: 'INVALID_RECURRENCE',
+        statusCode: 400,
+      });
+    }
+    return { type, time, dayOfWeek };
+  }
+  return { type, time };
+}
+
 export function toScheduledMessage(row: ScheduledMessageRow): ScheduledMessage {
   return {
     id: row.id,
@@ -38,6 +76,14 @@ export function toScheduledMessage(row: ScheduledMessageRow): ScheduledMessage {
     scheduledFor: row.scheduled_for,
     status: row.status,
     failureReason: row.failure_reason,
+    recurrence: row.recurrence === 'daily' || row.recurrence === 'weekly'
+      ? {
+          type: row.recurrence,
+          time: row.recurrence_time ?? '',
+          dayOfWeek: row.recurrence_dow,
+        }
+      : null,
+    seriesId: row.series_id,
     createdAt: row.created_at,
   };
 }
@@ -56,6 +102,7 @@ export const scheduledMessagesService = {
     content: string;
     options?: unknown;
     scheduledFor: string;
+    recurrence?: unknown;
   }): ScheduledMessage {
     const content = input.content.trim();
     if (!content) {
@@ -92,12 +139,15 @@ export const scheduledMessagesService = {
       });
     }
 
+    const recurrence = readRecurrence(input.recurrence);
+
     return toScheduledMessage(scheduledMessagesDb.create({
       userId: input.userId,
       sessionId: input.sessionId,
       content,
       options: input.options ?? {},
       scheduledFor,
+      recurrence,
     }));
   },
 

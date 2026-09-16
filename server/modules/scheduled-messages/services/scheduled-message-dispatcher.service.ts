@@ -1,4 +1,4 @@
-import { scheduledMessagesDb, sessionDraftsDb } from '@/modules/database/index.js';
+import { scheduledMessagesDb, sessionDraftsDb, sessionsDb } from '@/modules/database/index.js';
 import type { QueuedSessionMessageRecord, ScheduledMessageRow } from '@/modules/database/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
@@ -100,6 +100,78 @@ export async function dispatchQueuedMessages(runtime: ProviderRuntimeGateway): P
   return claimed;
 }
 
+/**
+ * The next wall-clock occurrence of a recurring schedule, strictly after
+ * `from`. Times are the server's local time — the same clock the person who
+ * scheduled it on this machine used.
+ */
+export function computeNextRecurrenceOccurrence(
+  from: Date,
+  recurrence: 'daily' | 'weekly',
+  timeOfDay: string,
+  dayOfWeek: number | null,
+): Date | null {
+  const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(timeOfDay ?? '');
+  if (!timeMatch) {
+    return null;
+  }
+  const hours = Number(timeMatch[1]);
+  const minutes = Number(timeMatch[2]);
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  const next = new Date(from);
+  next.setHours(hours, minutes, 0, 0);
+  if (next.getTime() <= from.getTime()) {
+    next.setDate(next.getDate() + 1);
+  }
+
+  if (recurrence === 'weekly') {
+    const targetDow = dayOfWeek;
+    if (targetDow === null || targetDow === undefined || targetDow < 0 || targetDow > 6) {
+      return null;
+    }
+    let guard = 0;
+    while (next.getDay() !== targetDow && guard < 8) {
+      next.setDate(next.getDate() + 1);
+      guard += 1;
+    }
+    if (guard >= 8) {
+      return null;
+    }
+  }
+
+  return next;
+}
+
+/**
+ * Books the next instance of a recurring series after one has fired.
+ *
+ * Rescheduled on failure too — a daily task whose session was busy at 9:00
+ * should try again tomorrow at 9:00, not quietly stop. The series does die
+ * with its session: once the session row is gone there is nothing to send to.
+ */
+function scheduleFollowingInstance(row: ScheduledMessageRow): void {
+  if (row.recurrence !== 'daily' && row.recurrence !== 'weekly') {
+    return;
+  }
+  if (!sessionsDb.getSessionById(row.session_id)) {
+    return;
+  }
+
+  const nextRunAt = computeNextRecurrenceOccurrence(
+    new Date(),
+    row.recurrence,
+    row.recurrence_time ?? '',
+    row.recurrence_dow,
+  );
+  if (!nextRunAt) {
+    return;
+  }
+  scheduledMessagesDb.createFollowingInstance(row, nextRunAt);
+}
+
 async function sendClaimedMessage(
   row: ScheduledMessageRow,
   runtime: ProviderRuntimeGateway,
@@ -129,6 +201,8 @@ async function sendClaimedMessage(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     scheduledMessagesDb.markFailed(row.id, message);
+  } finally {
+    scheduleFollowingInstance(row);
   }
 }
 
