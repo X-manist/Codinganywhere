@@ -1,7 +1,7 @@
 <div align="center">
  <img src="public/logo.svg" alt="CloudCLI UI" width="64" height="64">
  <h1>Cloud CLI (aka Claude Code UI)</h1>
- <p>A desktop and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Use it locally or remotely to view your active projects and sessions from everywhere.</p>
+ <p>A desktop and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, <a href="https://developers.openai.com/codex">Codex</a>, OpenCode and <a href="https://zcode.z.ai">ZCode</a>.<br>Use it locally or remotely to view your active projects and sessions from everywhere.</p>
 </div>
 
 <p align="center">
@@ -16,6 +16,33 @@
 </p>
 
 <div align="right"><i><b>English</b> · <a href="./docs/README.ru.md">Русский</a> · <a href="./docs/README.de.md">Deutsch</a> · <a href="./docs/README.ko.md">한국어</a> · <a href="./docs/README.zh-CN.md">简体中文</a> · <a href="./docs/README.zh-TW.md">繁體中文</a> · <a href="./docs/README.ja.md">日本語</a> · <a href="./docs/README.tr.md">Türkçe</a></i></div>
+
+---
+
+## What this fork adds (Codinganywhere)
+
+> 本 fork 在上游基础上新增了对 **ZCode(智谱 GLM)** 的完整支持,详见 [docs/zcode-provider.md](docs/zcode-provider.md)。
+
+- **ZCode provider** — Zhipu's GLM coding CLI joins Claude Code, Cursor CLI, Codex and OpenCode as a first-class provider:
+  - headless runs (`zcode -p --json`) with structured events, plus session resume (`--resume sess_...`) for multiple parallel sessions
+  - model catalog (GLM 5.3 Flash / GLM 5.3), auth status, MCP servers and skills read from `~/.zcode/cli/config.json`
+  - works in the model selector, settings tabs, embedded terminal and the REST API (`provider: "zcode"`)
+  - setup: install the ZCode desktop app (CLI ships at `ZCode.app/Contents/Resources/glm/zcode.cjs`, override with `ZCODE_CLI_PATH`) and configure a model provider in `~/.zcode/cli/config.json` — details in [docs/zcode-provider.md](docs/zcode-provider.md)
+- **Known zcode limitations** (vs the other providers): responses arrive when the run completes (no token streaming yet — `zcode app-server` integration is next), and session history replay inside the UI is empty (resume still works).
+
+### Scheduled / automated runs (定时任务)
+
+- **From the chat box**: click the **clock icon** next to the composer to schedule the current message at any time (e.g. "9:00 tomorrow"). The scheduler lives in the server database — it survives restarts and dispatches into the same session through the selected provider. One-shot schedules only.
+- **Recurring jobs**: use cron on the machine running the server and hit the REST API:
+
+  ```bash
+  # every day at 09:00, run a prompt in a project with any provider
+  0 9 * * * curl -s -X POST http://localhost:3001/api/agent \
+    -H 'x-api-key: ck_xxx' -H 'Content-Type: application/json' \
+    -d '{"message":"review yesterday commits and summarize","provider":"zcode","projectPath":"/path/to/project"}'
+  ```
+
+  Create the API key in **Settings → API Keys**; swap `provider` for `claude` / `codex` / `cursor` / `opencode` as needed.
 
 ---
 
@@ -61,9 +88,10 @@
 - **Git Explorer** - View, stage and commit your changes. You can also switch branches 
 - **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
 - **Session Management** - Resume conversations, manage multiple sessions, and track history
+- **Scheduled Messages** - Queue a chat message to be sent later from the composer's clock icon; persists across server restarts
 - **Plugin System** - Extend CloudCLI with custom plugins — add new tabs, backend services, and integrations. [Build your own →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
 - **TaskMaster AI Integration** *(Optional)* - Advanced project management with AI-powered task planning, PRD parsing, and workflow automation
-- **Model Compatibility** - Works with Claude and GPT model families (the full list of supported models is available at runtime via `GET /api/providers/:provider/models`)
+- **Model Compatibility** - Works with Claude, GPT and GLM model families (the full list of supported models is available at runtime via `GET /api/providers/:provider/models`)
 
 
 ## Quick Start
