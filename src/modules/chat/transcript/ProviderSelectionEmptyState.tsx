@@ -31,6 +31,7 @@ const PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "codex", name: "OpenAI" },
   { id: "cursor", name: "Cursor" },
   { id: "opencode", name: "OpenCode" },
+  { id: "zcode", name: "ZCode" },
 ];
 
 const MOD_KEY =
@@ -309,6 +310,10 @@ export default function ProviderSelectionEmptyState({
                 opencode: t("providerSelection.readyPrompt.opencode", {
                   model: providerModels.opencode,
                   defaultValue: "Ready with OpenCode {{model}}",
+                }),
+                zcode: t("providerSelection.readyPrompt.zcode", {
+                  model: providerModels.zcode,
+                  defaultValue: "Ready with ZCode {{model}}",
                 }),
               }[provider]
             }

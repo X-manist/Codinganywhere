@@ -397,7 +397,9 @@ function ChatInterface({
         ? t('messageTypes.codex')
         : provider === 'opencode'
             ? t('messageTypes.opencode', { defaultValue: 'OpenCode' })
-          : t('messageTypes.claude');
+            : provider === 'zcode'
+              ? t('messageTypes.zcode', { defaultValue: 'ZCode' })
+              : t('messageTypes.claude');
 
   if (!selectedProject) {
     return (

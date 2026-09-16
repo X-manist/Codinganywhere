@@ -104,6 +104,25 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
     supportsMessageEditing: false,
     supportsSessionForking: false,
   },
+  zcode: {
+    provider: 'zcode',
+    // Mapped by the runtime onto zcode headless modes: `--mode plan` (plan),
+    // `--mode build` (acceptEdits); `-p` defaults to yolo, which covers
+    // bypassPermissions/default. See resolveZcodePermissionOptions in the
+    // zcode runtime adapter.
+    permissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
+    defaultPermissionMode: 'default',
+    supportsImages: false,
+    supportsFiles: false,
+    supportsAbort: true,
+    supportsPermissionRequests: false,
+    supportsTokenUsage: true,
+    supportsEffort: false,
+    // Headless runs resume via `--resume sess_...`; zcode exposes no CLI
+    // surface for mid-transcript resume or branching yet.
+    supportsMessageEditing: false,
+    supportsSessionForking: false,
+  },
 };
 
 /**

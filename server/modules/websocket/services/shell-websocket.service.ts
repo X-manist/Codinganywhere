@@ -217,6 +217,17 @@ function buildShellCommand(
     return initialCommand || 'opencode';
   }
 
+  if (provider === 'zcode') {
+    // zcode ships inside the ZCode desktop bundle, so PATH alone often has no
+    // `zcode`; fall back to the bundled Node entrypoint. Sessions resume via
+    // the TUI's /resume command.
+    if (resumeSessionId) {
+      return `command -v zcode >/dev/null 2>&1 && zcode --resume "${resumeSessionId}" || node "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs" --resume "${resumeSessionId}"`;
+    }
+    return initialCommand
+      || `command -v zcode >/dev/null 2>&1 && zcode || node "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs"`;
+  }
+
   // Launching with the flag is what unlocks "bypass permissions" in the CLI's
   // shift+tab permission-mode cycle; it cannot be enabled from inside a
   // session started without it.
